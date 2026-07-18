@@ -76,6 +76,42 @@
   border-top: 14px solid #ffffff !important;
 }
 
+/* "…" thinking bubble pulses gently while awaiting a reply */
+#rot-blocker-overlay .rb-bubble--thinking {
+  animation: rb-thinking-pulse 1s ease-in-out infinite !important;
+}
+
+@keyframes rb-thinking-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* user's submitted line: floats up from the input and fades out */
+#rot-blocker-overlay .rb-user-bubble {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 110px !important;
+  transform: translate(-50%, 0) !important;
+  max-width: min(70vw, 460px) !important;
+  padding: 10px 16px !important;
+  background: #3b6ef0 !important;
+  color: #ffffff !important;
+  border-radius: 16px !important;
+  font-size: 1rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  pointer-events: none !important;
+  animation: rb-float-up 1600ms ease-out forwards !important;
+}
+
+@keyframes rb-float-up {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -140px); }
+}
+
 #rot-blocker-overlay .rb-bottom {
   position: absolute !important;
   left: 50% !important;

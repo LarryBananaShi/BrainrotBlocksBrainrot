@@ -230,11 +230,28 @@
 
     // Show a line and animate the character for a length-based duration.
     function speak(text) {
+      bubble.classList.remove("rb-bubble--thinking");
       setBubble(text);
       if (talkStopTimer) clearTimeout(talkStopTimer);
       startTalking();
       const dur = Math.min(6000, Math.max(1500, text.length * 55));
       talkStopTimer = setTimeout(stopTalking, dur);
+    }
+
+    // While waiting on the server: character goes idle and the bubble shows "…".
+    function showThinking() {
+      stopTalking();
+      setBubble("…");
+      bubble.classList.add("rb-bubble--thinking");
+    }
+
+    // The user's submitted line floats up from the input and fades out.
+    function spawnUserBubble(text) {
+      const b = document.createElement("div");
+      b.className = "rb-user-bubble";
+      b.textContent = text;
+      overlay.appendChild(b);
+      b.addEventListener("animationend", () => b.remove(), { once: true });
     }
     // -------------------------------------------------------------------------
 
@@ -258,9 +275,11 @@
       const text = input.value.trim();
       if (!text) return;
 
+      spawnUserBubble(text);
       history.push({ role: "user", content: text });
       input.value = "";
       input.disabled = true;
+      showThinking();
 
       const { reply, verdict } = await getCharacterResponse(text, persona, history);
       speak(reply);
