@@ -1,7 +1,6 @@
 // Rot Blocker — overlay content script
-// Step 5: timed pass per domain.
-// On "allow" we store a pass (now + duration) in chrome.storage.local.
-// On load, a valid pass skips the overlay and shows a countdown badge instead.
+// Step 6: blocklist + active persona come from storage; personas from personas.js.
+// Runs on all pages now, so it exits immediately when the host isn't blocked.
 
 (function () {
   const OVERLAY_ID = "rot-blocker-overlay";
@@ -10,69 +9,50 @@
     return; // avoid double-inject
   }
 
-  // Hardcoded for now; becomes storage-backed in Step 6.
-  const BLOCKLIST = ["youtube.com", "reddit.com", "twitter.com", "x.com"];
-  const PASS_DURATION_MS = 10 * 1000; // 10 min (lower this to test expiry)
+  const PASS_DURATION_MS = 10 * 60 * 1000; // 10 min (lower this to test expiry)
 
-  const persona = {
-    name: "David Goggins",
-    emoji: "😤",
-    opening:
-      "Where do you think you're going? You really about to throw away your day scrolling? Talk to me — why should I let you through?",
-  };
-
-  const history = [{ role: "assistant", content: persona.opening }];
-
-  // Which blocked domain does the current host belong to? (root key for passes)
-  function getBlockedDomain(hostname) {
+  function getBlockedDomain(hostname, blocklist) {
     return (
-      BLOCKLIST.find((d) => hostname === d || hostname.endsWith("." + d)) || null
+      blocklist.find((d) => hostname === d || hostname.endsWith("." + d)) || null
     );
   }
-  const domain = getBlockedDomain(location.hostname);
 
   // ---- pass storage -------------------------------------------------------
-  async function getValidPassExpiry(dom) {
+  async function getValidPassExpiry(domain) {
     const { passes = {} } = await chrome.storage.local.get("passes");
-    const expiry = passes[dom];
+    const expiry = passes[domain];
     if (expiry && expiry > Date.now()) return expiry;
     if (expiry) {
-      // clean up an expired pass
-      delete passes[dom];
+      delete passes[domain];
       await chrome.storage.local.set({ passes });
     }
     return null;
   }
 
-  async function grantPass(dom) {
+  async function grantPass(domain) {
     const { passes = {} } = await chrome.storage.local.get("passes");
-    passes[dom] = Date.now() + PASS_DURATION_MS;
+    passes[domain] = Date.now() + PASS_DURATION_MS;
     await chrome.storage.local.set({ passes });
-    return passes[dom];
+    return passes[domain];
   }
   // -------------------------------------------------------------------------
 
-  // ---- MOCK backend (unchanged from Step 4) -------------------------------
-  function getCharacterResponse(userMessage) {
+  // ---- MOCK backend (persona-aware; swapped for /chat in Step 7) ----------
+  function getCharacterResponse(userMessage, persona, history) {
     const looksLikeWork =
       /\b(work|deadline|research|study|studying|assignment|project|interview|class|exam)\b/i.test(
         userMessage
       );
-    const pushbacks = [
-      "Weak. That's the same excuse everybody gives. Try harder.",
-      "Nah. You don't actually believe that. Give me a real reason.",
-      "That's your comfort zone talking. What do you ACTUALLY need in there?",
-    ];
     let response;
     if (looksLikeWork) {
       response = {
-        reply:
-          "Alright. That's a real reason. Get in, do the work, don't waste it. I'm watching you.",
+        reply: persona.mock.allowLine,
         verdict: "allow",
         reason: "gave a concrete work-related justification",
       };
     } else {
       const turn = history.filter((m) => m.role === "user").length;
+      const pushbacks = persona.mock.pushbacks;
       response = {
         reply: pushbacks[Math.min(turn, pushbacks.length - 1)],
         verdict: "continue",
@@ -84,7 +64,7 @@
   // -------------------------------------------------------------------------
 
   // ---- countdown badge ----------------------------------------------------
-  function showTimer(expiry) {
+  function showTimer(expiry, domain) {
     if (document.getElementById(TIMER_ID)) return;
     const badge = document.createElement("div");
     badge.id = TIMER_ID;
@@ -94,7 +74,7 @@
       if (ms <= 0) {
         clearInterval(iv);
         badge.remove();
-        location.reload(); // pass expired -> overlay returns on reload
+        location.reload();
         return;
       }
       const m = Math.floor(ms / 60000);
@@ -108,71 +88,73 @@
   }
   // -------------------------------------------------------------------------
 
-  const overlay = document.createElement("div");
-  overlay.id = OVERLAY_ID;
-  overlay.innerHTML = `
-    <div class="rb-card">
-      <div class="rb-header">
-        <div class="rb-avatar">${persona.emoji}</div>
-        <div class="rb-name">${persona.name}</div>
+  function mountOverlay(persona, domain) {
+    const history = [{ role: "assistant", content: persona.opening }];
+
+    const overlay = document.createElement("div");
+    overlay.id = OVERLAY_ID;
+    overlay.innerHTML = `
+      <div class="rb-card">
+        <div class="rb-header">
+          <div class="rb-avatar">${persona.emoji}</div>
+          <div class="rb-name">${persona.name}</div>
+        </div>
+        <div class="rb-messages" id="rb-messages"></div>
+        <form class="rb-input-row" id="rb-form">
+          <input class="rb-input" id="rb-input" type="text" autocomplete="off"
+                 placeholder="Make your case..." />
+          <button class="rb-send" type="submit">Send</button>
+        </form>
+        <button class="rb-giveup" type="button">Fine, take me back</button>
       </div>
-      <div class="rb-messages" id="rb-messages"></div>
-      <form class="rb-input-row" id="rb-form">
-        <input class="rb-input" id="rb-input" type="text" autocomplete="off"
-               placeholder="Make your case..." />
-        <button class="rb-send" type="submit">Send</button>
-      </form>
-      <button class="rb-giveup" type="button">Fine, take me back</button>
-    </div>
-  `;
+    `;
 
-  function addMessage(role, text) {
-    const el = document.createElement("div");
-    el.className = "rb-msg rb-msg-" + role;
-    el.textContent = text;
-    const list = overlay.querySelector("#rb-messages");
-    list.appendChild(el);
-    list.scrollTop = list.scrollHeight;
-  }
-
-  async function allowThrough() {
-    const expiry = await grantPass(domain);
-    overlay.remove();
-    showTimer(expiry);
-  }
-
-  function giveUp() {
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      chrome.runtime.sendMessage({ type: "giveup" });
+    function addMessage(role, text) {
+      const el = document.createElement("div");
+      el.className = "rb-msg rb-msg-" + role;
+      el.textContent = text;
+      const list = overlay.querySelector("#rb-messages");
+      list.appendChild(el);
+      list.scrollTop = list.scrollHeight;
     }
-  }
 
-  async function handleSend(e) {
-    e.preventDefault();
-    const input = overlay.querySelector("#rb-input");
-    const text = input.value.trim();
-    if (!text) return;
-
-    addMessage("user", text);
-    history.push({ role: "user", content: text });
-    input.value = "";
-    input.disabled = true;
-
-    const { reply, verdict } = await getCharacterResponse(text);
-    addMessage("bot", reply);
-    history.push({ role: "assistant", content: reply });
-
-    if (verdict === "allow") {
-      setTimeout(allowThrough, 700); // let them read the parting line
-    } else {
-      input.disabled = false;
-      input.focus();
+    async function allowThrough() {
+      const expiry = await grantPass(domain);
+      overlay.remove();
+      showTimer(expiry, domain);
     }
-  }
 
-  function mountOverlay() {
+    function giveUp() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        chrome.runtime.sendMessage({ type: "giveup" });
+      }
+    }
+
+    async function handleSend(e) {
+      e.preventDefault();
+      const input = overlay.querySelector("#rb-input");
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage("user", text);
+      history.push({ role: "user", content: text });
+      input.value = "";
+      input.disabled = true;
+
+      const { reply, verdict } = await getCharacterResponse(text, persona, history);
+      addMessage("bot", reply);
+      history.push({ role: "assistant", content: reply });
+
+      if (verdict === "allow") {
+        setTimeout(allowThrough, 700);
+      } else {
+        input.disabled = false;
+        input.focus();
+      }
+    }
+
     (document.documentElement || document.body).appendChild(overlay);
     addMessage("bot", persona.opening);
     overlay.querySelector("#rb-form").addEventListener("submit", handleSend);
@@ -180,14 +162,21 @@
     overlay.querySelector("#rb-input").focus();
   }
 
-  // ---- init: valid pass -> timer only; otherwise -> overlay ---------------
+  // ---- init ---------------------------------------------------------------
   async function init() {
-    if (!domain) return; // safety; content script only runs on blocked domains
+    const { blocklist = ROT_DEFAULT_BLOCKLIST, activePersona = ROT_DEFAULT_PERSONA } =
+      await chrome.storage.local.get(["blocklist", "activePersona"]);
+
+    const domain = getBlockedDomain(location.hostname, blocklist);
+    if (!domain) return; // not a blocked site — do nothing
+
+    const persona = ROT_PERSONAS[activePersona] || ROT_PERSONAS[ROT_DEFAULT_PERSONA];
+
     const expiry = await getValidPassExpiry(domain);
     if (expiry) {
-      showTimer(expiry);
+      showTimer(expiry, domain);
     } else {
-      mountOverlay();
+      mountOverlay(persona, domain);
     }
   }
 
