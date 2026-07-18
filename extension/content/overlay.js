@@ -18,6 +18,9 @@
     centerNoise: 0.05, // rest offset from center, as a fraction of min(vw, vh)
     bobFrequencyHz: 3, // walking bob speed (bounces per second) while moving
     bobAmplitudePx: 16, // how far the sprite bobs up/down while walking
+    introShake: { intensity: 82, durationMs: 1050, intervalMs: 40, scaleBuffer: 1.12 }, // big shake on entrance
+    talkSwitchRange: { minMs: 90, maxMs: 200 }, // base<->talk swap while speaking
+    tungFlipRange: { minMs: 400, maxMs: 900 }, // horizontal flip cadence for Tung
   };
   // -------------------------------------------------------------------------
 
@@ -35,6 +38,35 @@
     const startY = Math.sin(startAngle) * startDist;
 
     return { startX, startY, restX, restY };
+  }
+
+  // Random value within a {minMs, maxMs} range.
+  function randInRange(r) {
+    return r.minMs + Math.random() * (r.maxMs - r.minMs);
+  }
+
+  // Jitter an element on a fixed, uniform cadence (`intervalMs`) with decaying
+  // intensity, then clear the transform.
+  // `scaleBuffer` > 1 slightly enlarges the target so translating it never
+  // exposes gaps at the viewport edges (used when shaking the full overlay).
+  function shake(target, intensity, durationMs, scaleBuffer = 1, intervalMs = 40) {
+    const start = performance.now();
+    const scalePart = scaleBuffer !== 1 ? ` scale(${scaleBuffer})` : "";
+    // Apply the scale once up front so the first step is just a translate
+    // (avoids a compositing hitch on the opening frame).
+    target.style.transform = `translate(0px, 0px)${scalePart}`;
+    const iv = setInterval(() => {
+      const elapsed = performance.now() - start;
+      if (elapsed >= durationMs) {
+        clearInterval(iv);
+        target.style.transform = "";
+        return;
+      }
+      const decay = 1 - elapsed / durationMs; // ease the shake out over its life
+      const dx = (Math.random() * 2 - 1) * intensity * decay;
+      const dy = (Math.random() * 2 - 1) * intensity * decay;
+      target.style.transform = `translate(${dx}px, ${dy}px)${scalePart}`;
+    }, intervalMs);
   }
 
   function getBlockedDomain(hostname, blocklist) {
@@ -157,6 +189,55 @@
       bubble.textContent = text;
     }
 
+    // ---- sprite animation: mouth-flap (swap) or horizontal flip (Tung) ------
+    const spriteDesc = persona.sprite;
+    let talkTimer = null;
+    let talkStopTimer = null;
+    let talkFrame = false;
+    let flipped = false;
+
+    function startTalking() {
+      if (talkTimer) clearTimeout(talkTimer);
+      const loop = () => {
+        if (spriteDesc.type === "swap") {
+          talkFrame = !talkFrame;
+          sprite.src = chrome.runtime.getURL(
+            talkFrame ? spriteDesc.talk : spriteDesc.base
+          );
+          talkTimer = setTimeout(loop, randInRange(CONFIG.talkSwitchRange));
+        } else {
+          flipped = !flipped;
+          sprite.style.transform = flipped ? "scaleX(-1)" : "scaleX(1)";
+          talkTimer = setTimeout(loop, randInRange(CONFIG.tungFlipRange));
+        }
+      };
+      loop();
+    }
+
+    function stopTalking() {
+      if (talkTimer) {
+        clearTimeout(talkTimer);
+        talkTimer = null;
+      }
+      if (talkStopTimer) {
+        clearTimeout(talkStopTimer);
+        talkStopTimer = null;
+      }
+      if (spriteDesc.type === "swap") {
+        sprite.src = chrome.runtime.getURL(spriteDesc.base); // back to idle
+      }
+    }
+
+    // Show a line and animate the character for a length-based duration.
+    function speak(text) {
+      setBubble(text);
+      if (talkStopTimer) clearTimeout(talkStopTimer);
+      startTalking();
+      const dur = Math.min(6000, Math.max(1500, text.length * 55));
+      talkStopTimer = setTimeout(stopTalking, dur);
+    }
+    // -------------------------------------------------------------------------
+
     async function allowThrough() {
       const expiry = await grantPass(domain);
       overlay.remove();
@@ -182,7 +263,7 @@
       input.disabled = true;
 
       const { reply, verdict } = await getCharacterResponse(text, persona, history);
-      setBubble(reply);
+      speak(reply);
       history.push({ role: "assistant", content: reply });
 
       if (verdict === "allow") {
@@ -237,6 +318,8 @@
       bubble.style.opacity = "1";
       form.style.opacity = "1";
       overlay.querySelector("#rb-input").focus();
+      shake(overlay, CONFIG.introShake.intensity, CONFIG.introShake.durationMs, CONFIG.introShake.scaleBuffer, CONFIG.introShake.intervalMs);
+      speak(persona.opening); // "WHAT ARE YOU DOING" — with mouth flap / flip
     }
     characterEl.addEventListener("transitionend", onArrival, { once: true });
     // Fallback in case transitionend doesn't fire (e.g. tab backgrounded).
