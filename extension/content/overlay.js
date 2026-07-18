@@ -21,6 +21,8 @@
     introShake: { intensity: 82, durationMs: 1050, intervalMs: 40, scaleBuffer: 1.12 }, // big shake on entrance
     talkSwitchRange: { minMs: 90, maxMs: 200 }, // base<->talk swap while speaking
     tungFlipRange: { minMs: 400, maxMs: 900 }, // horizontal flip cadence for Tung
+    messageShake: { intensity: 22, durationMs: 350, intervalMs: 40, scaleBuffer: 1.03 }, // smaller shake per reply
+    spriteNudge: { intensity: 8, durationMs: 300 }, // little bump on the sprite per reply
   };
   // -------------------------------------------------------------------------
 
@@ -253,6 +255,23 @@
       overlay.appendChild(b);
       b.addEventListener("animationend", () => b.remove(), { once: true });
     }
+
+    // A small jitter on the character itself (kept relative to its rest spot).
+    function nudgeCharacter(intensity, durationMs) {
+      const start = performance.now();
+      const iv = setInterval(() => {
+        const elapsed = performance.now() - start;
+        if (elapsed >= durationMs) {
+          clearInterval(iv);
+          characterEl.style.transform = restTransform;
+          return;
+        }
+        const decay = 1 - elapsed / durationMs;
+        const dx = (Math.random() * 2 - 1) * intensity * decay;
+        const dy = (Math.random() * 2 - 1) * intensity * decay;
+        characterEl.style.transform = `${restTransform} translate(${dx}px, ${dy}px)`;
+      }, 30);
+    }
     // -------------------------------------------------------------------------
 
     async function allowThrough() {
@@ -283,6 +302,14 @@
 
       const { reply, verdict } = await getCharacterResponse(text, persona, history);
       speak(reply);
+      shake(
+        overlay,
+        CONFIG.messageShake.intensity,
+        CONFIG.messageShake.durationMs,
+        CONFIG.messageShake.scaleBuffer,
+        CONFIG.messageShake.intervalMs
+      );
+      nudgeCharacter(CONFIG.spriteNudge.intensity, CONFIG.spriteNudge.durationMs);
       history.push({ role: "assistant", content: reply });
 
       if (verdict === "allow") {
@@ -334,6 +361,7 @@
       if (arrived) return;
       arrived = true;
       sprite.style.animation = "none"; // stop walking bob on arrival
+      characterEl.style.transition = "none"; // nudges should be instant, not glide
       bubble.style.opacity = "1";
       form.style.opacity = "1";
       overlay.querySelector("#rb-input").focus();
