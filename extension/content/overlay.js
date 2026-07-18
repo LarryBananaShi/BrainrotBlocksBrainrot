@@ -9,13 +9,15 @@
     return; // avoid double-inject
   }
 
-  const PASS_DURATION_MS = 10 * 60 * 1000; // 10 min (lower this to test expiry)
-
   // ---- tunable knobs (grows as features land) -----------------------------
   const CONFIG = {
     characterSizePct: 0.55, // sprite height as a fraction of viewport height
     crawlInDurationMs: 4000, // how long the creep-in takes
+    crawlOutDurationMs: 4500, // how long the walk-out (on "allow") takes
+    backWalkDurationMs: 3500, // how long the escort walk (on "give up") takes
+    backNavDelayMs: 0, // pause after the escort leaves before going back
     centerNoise: 0.05, // rest offset from center, as a fraction of min(vw, vh)
+    passDurationMs: 10 * 60 * 1000, // how long a granted pass lasts (10 min)
     bobFrequencyHz: 3, // walking bob speed (bounces per second) while moving
     bobAmplitudePx: 16, // how far the sprite bobs up/down while walking
     introShake: { intensity: 82, durationMs: 1050, intervalMs: 40, scaleBuffer: 1.12 }, // big shake on entrance
@@ -91,7 +93,7 @@
 
   async function grantPass(domain) {
     const { passes = {} } = await chrome.storage.local.get("passes");
-    passes[domain] = Date.now() + PASS_DURATION_MS;
+    passes[domain] = Date.now() + CONFIG.passDurationMs;
     await chrome.storage.local.set({ passes });
     return passes[domain];
   }
@@ -274,18 +276,84 @@
     }
     // -------------------------------------------------------------------------
 
-    async function allowThrough() {
-      const expiry = await grantPass(domain);
-      overlay.remove();
-      showTimer(expiry, domain);
+    // Fade out the UI, restart the walking bob, and glide the character to a
+    // target transform over `durationMs`; run `done` once it arrives.
+    function walkTo(targetTransform, durationMs, done) {
+      bubble.style.opacity = "0";
+      form.style.opacity = "0";
+      stopTalking();
+
+      sprite.style.setProperty("--rb-bob-amp", CONFIG.bobAmplitudePx + "px");
+      sprite.style.animation =
+        `rb-bob ${1000 / CONFIG.bobFrequencyHz}ms linear infinite`;
+
+      characterEl.style.transition = `transform ${durationMs}ms linear`;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          characterEl.style.transform = targetTransform;
+        });
+      });
+
+      let done_ = false;
+      const finish = (e) => {
+        // Ignore transitions bubbling up from children (e.g. the bubble fade).
+        if (e && (e.target !== characterEl || e.propertyName !== "transform")) return;
+        if (done_) return;
+        done_ = true;
+        characterEl.removeEventListener("transitionend", finish);
+        sprite.style.animation = "none";
+        done();
+      };
+      characterEl.addEventListener("transitionend", finish);
+      setTimeout(finish, durationMs + 100);
+    }
+
+    // Walk the character straight off-screen (used on "allow").
+    function crawlOut(done) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.hypot(vw, vh) * 0.75;
+      walkTo(
+        `translate(-50%, -50%) translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`,
+        CONFIG.crawlOutDurationMs,
+        done
+      );
+    }
+
+    function allowThrough() {
+      crawlOut(async () => {
+        const expiry = await grantPass(domain);
+        overlay.remove();
+        showTimer(expiry, domain);
+      });
     }
 
     function giveUp() {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        chrome.runtime.sendMessage({ type: "giveup" });
-      }
+      const input = overlay.querySelector("#rb-input");
+      input.disabled = true;
+      // Escort the user back: walk just far enough off the top-left corner that
+      // the sprite fully clears the visible window.
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = sprite.getBoundingClientRect();
+      const margin = 20; // small buffer past the edge
+      const exitX = -rect.width / 2 - margin - vw / 2;
+      const exitY = -rect.height / 2 - margin - vh / 2;
+      walkTo(
+        `translate(-50%, -50%) translate(${exitX}px, ${exitY}px)`,
+        CONFIG.backWalkDurationMs,
+        () => {
+          // small beat after the character has left before taking them back
+          setTimeout(() => {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              chrome.runtime.sendMessage({ type: "giveup" });
+            }
+          }, CONFIG.backNavDelayMs);
+        }
+      );
     }
 
     async function handleSend(e) {
@@ -313,7 +381,7 @@
       history.push({ role: "assistant", content: reply });
 
       if (verdict === "allow") {
-        setTimeout(allowThrough, 700);
+        setTimeout(allowThrough, 1000);
       } else {
         input.disabled = false;
         input.focus();
@@ -357,9 +425,12 @@
 
     // Fire once when the walk finishes: stop the bob and reveal the UI.
     let arrived = false;
-    function onArrival() {
+    function onArrival(e) {
+      // Ignore transitions bubbling up from children.
+      if (e && (e.target !== characterEl || e.propertyName !== "transform")) return;
       if (arrived) return;
       arrived = true;
+      characterEl.removeEventListener("transitionend", onArrival);
       sprite.style.animation = "none"; // stop walking bob on arrival
       characterEl.style.transition = "none"; // nudges should be instant, not glide
       bubble.style.opacity = "1";
@@ -368,7 +439,7 @@
       shake(overlay, CONFIG.introShake.intensity, CONFIG.introShake.durationMs, CONFIG.introShake.scaleBuffer, CONFIG.introShake.intervalMs);
       speak(persona.opening); // "WHAT ARE YOU DOING" — with mouth flap / flip
     }
-    characterEl.addEventListener("transitionend", onArrival, { once: true });
+    characterEl.addEventListener("transitionend", onArrival);
     // Fallback in case transitionend doesn't fire (e.g. tab backgrounded).
     setTimeout(onArrival, CONFIG.crawlInDurationMs + 100);
   }
