@@ -23,7 +23,7 @@
   position: absolute !important;
   left: 50% !important;
   top: 50% !important;
-  transform: translate(-50%, -50%) !important;
+  transform: translate(-50%, -50%);
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -37,6 +37,13 @@
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.55)) !important;
   -webkit-user-drag: none !important;
   user-select: none !important;
+}
+
+/* walking bob applied to the sprite while it crawls in */
+@keyframes rb-bob {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(calc(-1 * var(--rb-bob-amp, 12px))); }
+  100% { transform: translateY(0); }
 }
 
 #rot-blocker-overlay .rb-bubble {
@@ -54,6 +61,7 @@
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  transition: opacity 250ms ease !important;
 }
 
 /* comic tail pointing down toward the character */
@@ -78,6 +86,7 @@
   align-items: center !important;
   gap: 10px !important;
   width: min(92vw, 560px) !important;
+  transition: opacity 250ms ease !important;
 }
 
 #rot-blocker-overlay .rb-input-row {

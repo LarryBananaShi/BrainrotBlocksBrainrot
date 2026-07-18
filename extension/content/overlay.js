@@ -13,9 +13,29 @@
 
   // ---- tunable knobs (grows as features land) -----------------------------
   const CONFIG = {
-    characterSizePct: 0.38, // sprite height as a fraction of viewport height
+    characterSizePct: 0.55, // sprite height as a fraction of viewport height
+    crawlInDurationMs: 4000, // how long the creep-in takes
+    centerNoise: 0.05, // rest offset from center, as a fraction of min(vw, vh)
+    bobFrequencyHz: 3, // walking bob speed (bounces per second) while moving
+    bobAmplitudePx: 16, // how far the sprite bobs up/down while walking
   };
   // -------------------------------------------------------------------------
+
+  // Pick a random off-screen start point and a slightly-off-center rest point.
+  // Offsets are relative to the viewport center (the element's CSS anchor).
+  function computeEntryPosition(vw, vh, centerNoise) {
+    const restAngle = Math.random() * Math.PI * 2;
+    const restMag = centerNoise * Math.min(vw, vh) * Math.random();
+    const restX = Math.cos(restAngle) * restMag;
+    const restY = Math.sin(restAngle) * restMag;
+
+    const startAngle = Math.random() * Math.PI * 2;
+    const startDist = Math.hypot(vw, vh) * 0.75; // well outside the viewport
+    const startX = Math.cos(startAngle) * startDist;
+    const startY = Math.sin(startAngle) * startDist;
+
+    return { startX, startY, restX, restY };
+  }
 
   function getBlockedDomain(hostname, blocklist) {
     return (
@@ -177,8 +197,50 @@
     setBubble(persona.opening);
     overlay.querySelector("#rb-form").addEventListener("submit", handleSend);
     overlay.querySelector(".rb-giveup").addEventListener("click", giveUp);
-    void characterEl; // reserved for crawl-in animation (Step 3)
-    overlay.querySelector("#rb-input").focus();
+
+    // ---- crawl-in: start off-screen, glide to a slightly-off-center rest ----
+    const form = overlay.querySelector("#rb-form");
+    const pos = computeEntryPosition(
+      window.innerWidth,
+      window.innerHeight,
+      CONFIG.centerNoise
+    );
+    const restTransform =
+      `translate(-50%, -50%) translate(${pos.restX}px, ${pos.restY}px)`;
+
+    bubble.style.opacity = "0";
+    form.style.opacity = "0";
+    characterEl.style.transition = "none";
+    characterEl.style.transform =
+      `translate(-50%, -50%) translate(${pos.startX}px, ${pos.startY}px)`;
+
+    // Walking bob: oscillate the sprite vertically while it moves.
+    sprite.style.setProperty("--rb-bob-amp", CONFIG.bobAmplitudePx + "px");
+    sprite.style.animation =
+      `rb-bob ${1000 / CONFIG.bobFrequencyHz}ms linear infinite`;
+
+    // Two rAFs so the browser commits the start transform before we transition.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        characterEl.style.transition =
+          `transform ${CONFIG.crawlInDurationMs}ms linear`;
+        characterEl.style.transform = restTransform;
+      });
+    });
+
+    // Fire once when the walk finishes: stop the bob and reveal the UI.
+    let arrived = false;
+    function onArrival() {
+      if (arrived) return;
+      arrived = true;
+      sprite.style.animation = "none"; // stop walking bob on arrival
+      bubble.style.opacity = "1";
+      form.style.opacity = "1";
+      overlay.querySelector("#rb-input").focus();
+    }
+    characterEl.addEventListener("transitionend", onArrival, { once: true });
+    // Fallback in case transitionend doesn't fire (e.g. tab backgrounded).
+    setTimeout(onArrival, CONFIG.crawlInDurationMs + 100);
   }
 
   // ---- init ---------------------------------------------------------------
