@@ -1,11 +1,18 @@
 // Rot Blocker — overlay content script
-// Step 4: argue chat UI with MOCKED responses.
-// getCharacterResponse() is shaped like the future /chat call
-// ({ reply, verdict, reason }) so it can be swapped for a real fetch later.
+// Step 5: timed pass per domain.
+// On "allow" we store a pass (now + duration) in chrome.storage.local.
+// On load, a valid pass skips the overlay and shows a countdown badge instead.
 
 (function () {
   const OVERLAY_ID = "rot-blocker-overlay";
-  if (document.getElementById(OVERLAY_ID)) return; // avoid double-inject
+  const TIMER_ID = "rot-blocker-timer";
+  if (document.getElementById(OVERLAY_ID) || document.getElementById(TIMER_ID)) {
+    return; // avoid double-inject
+  }
+
+  // Hardcoded for now; becomes storage-backed in Step 6.
+  const BLOCKLIST = ["youtube.com", "reddit.com", "twitter.com", "x.com"];
+  const PASS_DURATION_MS = 10 * 1000; // 10 min (lower this to test expiry)
 
   const persona = {
     name: "David Goggins",
@@ -14,24 +21,48 @@
       "Where do you think you're going? You really about to throw away your day scrolling? Talk to me — why should I let you through?",
   };
 
-  // Conversation history (roles mirror what the LLM API will expect later).
   const history = [{ role: "assistant", content: persona.opening }];
 
-  // ---- MOCK backend -------------------------------------------------------
-  // Deterministic so both paths are testable: a message that sounds like real
-  // work earns an "allow"; anything else gets pushback ("continue").
+  // Which blocked domain does the current host belong to? (root key for passes)
+  function getBlockedDomain(hostname) {
+    return (
+      BLOCKLIST.find((d) => hostname === d || hostname.endsWith("." + d)) || null
+    );
+  }
+  const domain = getBlockedDomain(location.hostname);
+
+  // ---- pass storage -------------------------------------------------------
+  async function getValidPassExpiry(dom) {
+    const { passes = {} } = await chrome.storage.local.get("passes");
+    const expiry = passes[dom];
+    if (expiry && expiry > Date.now()) return expiry;
+    if (expiry) {
+      // clean up an expired pass
+      delete passes[dom];
+      await chrome.storage.local.set({ passes });
+    }
+    return null;
+  }
+
+  async function grantPass(dom) {
+    const { passes = {} } = await chrome.storage.local.get("passes");
+    passes[dom] = Date.now() + PASS_DURATION_MS;
+    await chrome.storage.local.set({ passes });
+    return passes[dom];
+  }
+  // -------------------------------------------------------------------------
+
+  // ---- MOCK backend (unchanged from Step 4) -------------------------------
   function getCharacterResponse(userMessage) {
     const looksLikeWork =
       /\b(work|deadline|research|study|studying|assignment|project|interview|class|exam)\b/i.test(
         userMessage
       );
-
     const pushbacks = [
       "Weak. That's the same excuse everybody gives. Try harder.",
       "Nah. You don't actually believe that. Give me a real reason.",
       "That's your comfort zone talking. What do you ACTUALLY need in there?",
     ];
-
     let response;
     if (looksLikeWork) {
       response = {
@@ -48,9 +79,32 @@
         reason: "excuse not convincing",
       };
     }
-
-    // Simulate network latency so the UI flow matches the real thing.
     return new Promise((resolve) => setTimeout(() => resolve(response), 400));
+  }
+  // -------------------------------------------------------------------------
+
+  // ---- countdown badge ----------------------------------------------------
+  function showTimer(expiry) {
+    if (document.getElementById(TIMER_ID)) return;
+    const badge = document.createElement("div");
+    badge.id = TIMER_ID;
+
+    const render = () => {
+      const ms = expiry - Date.now();
+      if (ms <= 0) {
+        clearInterval(iv);
+        badge.remove();
+        location.reload(); // pass expired -> overlay returns on reload
+        return;
+      }
+      const m = Math.floor(ms / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      badge.textContent = `⏳ ${domain} · ${m}:${String(s).padStart(2, "0")}`;
+    };
+
+    (document.body || document.documentElement).appendChild(badge);
+    render();
+    const iv = setInterval(render, 1000);
   }
   // -------------------------------------------------------------------------
 
@@ -81,10 +135,10 @@
     list.scrollTop = list.scrollHeight;
   }
 
-  function allowThrough() {
-    // Remove the overlay so the real page is usable.
-    // (Timed pass so it doesn't re-trigger on reload comes in Step 5.)
+  async function allowThrough() {
+    const expiry = await grantPass(domain);
     overlay.remove();
+    showTimer(expiry);
   }
 
   function giveUp() {
@@ -118,7 +172,7 @@
     }
   }
 
-  function mount() {
+  function mountOverlay() {
     (document.documentElement || document.body).appendChild(overlay);
     addMessage("bot", persona.opening);
     overlay.querySelector("#rb-form").addEventListener("submit", handleSend);
@@ -126,9 +180,16 @@
     overlay.querySelector("#rb-input").focus();
   }
 
-  if (document.documentElement) {
-    mount();
-  } else {
-    document.addEventListener("DOMContentLoaded", mount);
+  // ---- init: valid pass -> timer only; otherwise -> overlay ---------------
+  async function init() {
+    if (!domain) return; // safety; content script only runs on blocked domains
+    const expiry = await getValidPassExpiry(domain);
+    if (expiry) {
+      showTimer(expiry);
+    } else {
+      mountOverlay();
+    }
   }
+
+  init();
 })();

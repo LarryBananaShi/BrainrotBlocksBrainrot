@@ -136,3 +136,22 @@
 #rot-blocker-overlay .rb-giveup:hover {
   color: #b3bccb !important;
 }
+
+
+/* Countdown badge shown while a timed pass is active. */
+#rot-blocker-timer {
+  position: fixed !important;
+  right: 16px !important;
+  bottom: 16px !important;
+  z-index: 2147483647 !important;
+  padding: 8px 14px !important;
+  border-radius: 999px !important;
+  background: rgba(23, 26, 33, 0.92) !important;
+  border: 1px solid #2c3340 !important;
+  color: #e8ecf3 !important;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 0.9rem !important;
+  font-variant-numeric: tabular-nums !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+  pointer-events: none !important;
+}
