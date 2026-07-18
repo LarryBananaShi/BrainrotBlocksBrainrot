@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Rot Blocker",
+  "version": "0.1.0",
+  "description": "Pop-culture characters guard your distracting sites.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Rot Blocker"
+  },
+  "permissions": [
+    "storage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["personas.js", "content/overlay.js"],
+      "css": ["content/overlay.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

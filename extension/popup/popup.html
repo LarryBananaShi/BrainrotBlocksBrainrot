@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>Rot Blocker</h1>
+
+    <section>
+      <h2>Guardian</h2>
+      <div id="persona-list" class="persona-list"></div>
+    </section>
+
+    <section>
+      <h2>Blocked sites</h2>
+      <ul id="blocklist" class="blocklist"></ul>
+      <form id="add-form" class="add-form">
+        <input id="add-input" type="text" autocomplete="off"
+               placeholder="add site, e.g. instagram.com" />
+        <button type="submit">Add</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Active passes</h2>
+      <ul id="passes" class="passes"></ul>
+    </section>
+
+    <script src="../personas.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
