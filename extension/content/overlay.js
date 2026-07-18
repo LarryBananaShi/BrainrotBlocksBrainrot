@@ -37,29 +37,33 @@
   }
   // -------------------------------------------------------------------------
 
-  // ---- MOCK backend (persona-aware; swapped for /chat in Step 7) ----------
+  // ---- backend: relay the argue turn through the background worker -------
+  // (Background does the fetch so we sidestep page CORS.)
   function getCharacterResponse(userMessage, persona, history) {
-    const looksLikeWork =
-      /\b(work|deadline|research|study|studying|assignment|project|interview|class|exam)\b/i.test(
-        userMessage
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "chat", persona: persona.id, history },
+        (response) => {
+          if (chrome.runtime.lastError || !response || response.error) {
+            resolve({
+              reply:
+                "(The gatekeeper isn't responding — is the server running?)",
+              verdict: "continue",
+              reason: "server error",
+            });
+            return;
+          }
+          const verdict = ["allow", "deny", "continue"].includes(response.verdict)
+            ? response.verdict
+            : "continue";
+          resolve({
+            reply: response.reply || "...",
+            verdict,
+            reason: response.reason || "",
+          });
+        }
       );
-    let response;
-    if (looksLikeWork) {
-      response = {
-        reply: persona.mock.allowLine,
-        verdict: "allow",
-        reason: "gave a concrete work-related justification",
-      };
-    } else {
-      const turn = history.filter((m) => m.role === "user").length;
-      const pushbacks = persona.mock.pushbacks;
-      response = {
-        reply: pushbacks[Math.min(turn, pushbacks.length - 1)],
-        verdict: "continue",
-        reason: "excuse not convincing",
-      };
-    }
-    return new Promise((resolve) => setTimeout(() => resolve(response), 400));
+    });
   }
   // -------------------------------------------------------------------------
 
