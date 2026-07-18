@@ -2,30 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,600;1,9..144,700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Rot Blocker</h1>
+    <div class="pages" id="pages">
+      <section class="page" data-page="character">
+        <span class="brand anim">ROT&nbsp;BLOCKER</span>
+        <h2 class="title title-serif anim">Character Select</h2>
+        <div class="carousel anim">
+          <button class="wheel" id="persona-prev" type="button" aria-label="Rotate left">
+            &#8249;
+          </button>
+          <div class="stack" id="persona-stack"></div>
+          <button class="wheel" id="persona-next" type="button" aria-label="Rotate right">
+            &#8250;
+          </button>
+        </div>
+        <p class="persona-name anim" id="persona-name">&mdash;</p>
+        <p class="persona-quote anim" id="persona-quote"></p>
+        <div class="scroll-hint anim">scroll &#8595;</div>
+      </section>
 
-    <section>
-      <h2>Guardian</h2>
-      <div id="persona-list" class="persona-list"></div>
-    </section>
+      <section class="page" data-page="blocked">
+        <h2 class="title anim">Blocked Sites:</h2>
+        <ul id="blocklist" class="sites anim"></ul>
+        <form id="add-form" class="add-row anim">
+          <input
+            id="add-input"
+            type="text"
+            autocomplete="off"
+            placeholder="add a site..."
+          />
+          <button type="submit" class="add-btn" aria-label="Add site">+</button>
+        </form>
 
-    <section>
-      <h2>Blocked sites</h2>
-      <ul id="blocklist" class="blocklist"></ul>
-      <form id="add-form" class="add-form">
-        <input id="add-input" type="text" autocomplete="off"
-               placeholder="add site, e.g. instagram.com" />
-        <button type="submit">Add</button>
-      </form>
-    </section>
-
-    <section>
-      <h2>Active passes</h2>
-      <ul id="passes" class="passes"></ul>
-    </section>
+        <h2 class="title subtitle anim">Active Passes</h2>
+        <ul id="passes" class="passes anim"></ul>
+      </section>
+    </div>
 
     <script src="../personas.js"></script>
     <script src="popup.js"></script>
