@@ -11,6 +11,12 @@
 
   const PASS_DURATION_MS = 10 * 60 * 1000; // 10 min (lower this to test expiry)
 
+  // ---- tunable knobs (grows as features land) -----------------------------
+  const CONFIG = {
+    characterSizePct: 0.38, // sprite height as a fraction of viewport height
+  };
+  // -------------------------------------------------------------------------
+
   function getBlockedDomain(hostname, blocklist) {
     return (
       blocklist.find((d) => hostname === d || hostname.endsWith("." + d)) || null
@@ -92,34 +98,43 @@
   }
   // -------------------------------------------------------------------------
 
+  // Resolve the idle (mouth-closed / standalone) sprite for a persona.
+  function spriteIdleSrc(persona) {
+    const s = persona.sprite;
+    return chrome.runtime.getURL(s.type === "flip" ? s.image : s.base);
+  }
+
   function mountOverlay(persona, domain) {
     const history = [{ role: "assistant", content: persona.opening }];
 
     const overlay = document.createElement("div");
     overlay.id = OVERLAY_ID;
     overlay.innerHTML = `
-      <div class="rb-card">
-        <div class="rb-header">
-          <div class="rb-avatar">${persona.emoji}</div>
-          <div class="rb-name">${persona.name}</div>
+      <div class="rb-stage">
+        <div class="rb-character" id="rb-character">
+          <div class="rb-bubble" id="rb-bubble"></div>
+          <img class="rb-sprite" id="rb-sprite" alt="" draggable="false" />
         </div>
-        <div class="rb-messages" id="rb-messages"></div>
-        <form class="rb-input-row" id="rb-form">
+      </div>
+      <form class="rb-bottom" id="rb-form">
+        <div class="rb-input-row">
           <input class="rb-input" id="rb-input" type="text" autocomplete="off"
                  placeholder="Make your case..." />
           <button class="rb-send" type="submit">Send</button>
-        </form>
+        </div>
         <button class="rb-giveup" type="button">Fine, take me back</button>
-      </div>
+      </form>
     `;
 
-    function addMessage(role, text) {
-      const el = document.createElement("div");
-      el.className = "rb-msg rb-msg-" + role;
-      el.textContent = text;
-      const list = overlay.querySelector("#rb-messages");
-      list.appendChild(el);
-      list.scrollTop = list.scrollHeight;
+    const sprite = overlay.querySelector("#rb-sprite");
+    const bubble = overlay.querySelector("#rb-bubble");
+    const characterEl = overlay.querySelector("#rb-character");
+
+    sprite.src = spriteIdleSrc(persona);
+    sprite.style.height = CONFIG.characterSizePct * 100 + "vh";
+
+    function setBubble(text) {
+      bubble.textContent = text;
     }
 
     async function allowThrough() {
@@ -142,13 +157,12 @@
       const text = input.value.trim();
       if (!text) return;
 
-      addMessage("user", text);
       history.push({ role: "user", content: text });
       input.value = "";
       input.disabled = true;
 
       const { reply, verdict } = await getCharacterResponse(text, persona, history);
-      addMessage("bot", reply);
+      setBubble(reply);
       history.push({ role: "assistant", content: reply });
 
       if (verdict === "allow") {
@@ -160,9 +174,10 @@
     }
 
     (document.documentElement || document.body).appendChild(overlay);
-    addMessage("bot", persona.opening);
+    setBubble(persona.opening);
     overlay.querySelector("#rb-form").addEventListener("submit", handleSend);
     overlay.querySelector(".rb-giveup").addEventListener("click", giveUp);
+    void characterEl; // reserved for crawl-in animation (Step 3)
     overlay.querySelector("#rb-input").focus();
   }
 

@@ -10,6 +10,7 @@ var ROT_PERSONAS = {
     id: "goggins",
     name: "David Goggins",
     emoji: "😤",
+    sprite: { type: "swap", base: "assets/GOGGINS_BASE.png", talk: "assets/GOGGINS_TALK.png" },
     opening:
       "Where do you think you're going? You really about to throw away your day scrolling? Talk to me — why should I let you through?",
     systemPrompt:
@@ -33,6 +34,7 @@ var ROT_PERSONAS = {
     id: "obama",
     name: "Barack Obama",
     emoji: "🎙️",
+    sprite: { type: "swap", base: "assets/OBAMA_BASE.png", talk: "assets/OBAMA_TALK.png" },
     opening:
       "So... we're here again. Let me be clear: this site isn't going anywhere. Tell me — why do you really need to be on it right now?",
     systemPrompt:
@@ -56,6 +58,7 @@ var ROT_PERSONAS = {
     id: "tungtung",
     name: "Tung Tung Tung Sahur",
     emoji: "🥁",
+    sprite: { type: "flip", image: "assets/TUNG.png" },
     opening:
       "TUNG! TUNG! TUNG! You come to ME for the brainrot?? Bahaha. Convince me, funny human — why should I open the door?",
     systemPrompt:
