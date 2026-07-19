@@ -44,6 +44,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           body: JSON.stringify({
             persona: message.persona,
             history: message.history,
+            domain: message.domain,
           }),
         });
         if (!resp.ok) {
