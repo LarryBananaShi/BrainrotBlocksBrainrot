@@ -384,13 +384,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 7px 4px;
   font-size: 1.05rem;
+}
+
+.pass-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pass-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .passes .time {
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+}
+
+.passes li:hover .remove {
+  opacity: 1;
 }
 
 /* ---- persona quote ---- */

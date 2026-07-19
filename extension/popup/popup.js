@@ -136,14 +136,36 @@ function renderPasses(passes) {
     const ms = exp - now;
     const m = Math.floor(ms / 60000);
     const s = Math.floor((ms % 60000) / 1000);
+
     const li = document.createElement("li");
+
     const label = document.createElement("span");
+    label.className = "pass-name";
     label.textContent = domain;
+
+    const right = document.createElement("span");
+    right.className = "pass-right";
+
     const time = document.createElement("span");
     time.className = "time";
     time.textContent = `${m}:${String(s).padStart(2, "0")}`;
+
+    const remove = document.createElement("button");
+    remove.className = "remove";
+    remove.type = "button";
+    remove.textContent = "✕";
+    remove.title = "End this pass";
+    remove.addEventListener("click", async () => {
+      const { passes = {} } = await chrome.storage.local.get("passes");
+      delete passes[domain];
+      await chrome.storage.local.set({ passes });
+      renderPasses(passes);
+    });
+
+    right.appendChild(time);
+    right.appendChild(remove);
     li.appendChild(label);
-    li.appendChild(time);
+    li.appendChild(right);
     ul.appendChild(li);
   });
 }
