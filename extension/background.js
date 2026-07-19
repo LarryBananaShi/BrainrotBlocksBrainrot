@@ -20,7 +20,13 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // "Fine, take me back" fallback: redirect the tab to the productive page.
+  // "Fine, take me back" with nowhere to go back to: close the tab entirely.
+  if (message?.type === "closeTab" && sender.tab) {
+    chrome.tabs.remove(sender.tab.id);
+    return; // synchronous
+  }
+
+  // Legacy fallback: redirect the tab to the productive page.
   if (message?.type === "giveup" && sender.tab) {
     chrome.tabs.update(sender.tab.id, {
       url: chrome.runtime.getURL("blocked.html"),

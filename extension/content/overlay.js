@@ -346,11 +346,23 @@
         () => {
           // small beat after the character has left before taking them back
           setTimeout(() => {
-            if (window.history.length > 1) {
-              window.history.back();
-            } else {
-              chrome.runtime.sendMessage({ type: "giveup" });
+            // No history to return to → close the tab instead.
+            if (window.history.length <= 1) {
+              chrome.runtime.sendMessage({ type: "closeTab" });
+              return;
             }
+
+            // Try to go back. If it's a real off-site entry, the page unloads
+            // and this script dies (the timeout never fires). If "back" was a
+            // same-document SPA hop that leaves us on the blocked site, close
+            // the tab so the user actually escapes.
+            const before = location.href;
+            window.history.back();
+            setTimeout(() => {
+              if (location.href === before) {
+                chrome.runtime.sendMessage({ type: "closeTab" });
+              }
+            }, 400);
           }, CONFIG.backNavDelayMs);
         }
       );
