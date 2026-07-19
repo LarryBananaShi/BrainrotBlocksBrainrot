@@ -15,6 +15,7 @@
     crawlInDurationMs: 4000, // how long the creep-in takes
     crawlOutDurationMs: 4500, // how long the walk-out (on "allow") takes
     allowLingerMs: 600, // pause after the "allow" line finishes before walking out
+    maxFailedAttempts: 5, // failed argue turns before the user is escorted back
     backWalkDurationMs: 3500, // how long the escort walk (on "give up") takes
     backNavDelayMs: 0, // pause after the escort leaves before going back
     centerNoise: 0.05, // rest offset from center, as a fraction of min(vw, vh)
@@ -118,10 +119,10 @@
 
   // ---- backend: relay the argue turn through the background worker -------
   // (Background does the fetch so we sidestep page CORS.)
-  function getCharacterResponse(userMessage, persona, history) {
+  function getCharacterResponse(userMessage, persona, history, domain) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
-        { type: "chat", persona: persona.id, history },
+        { type: "chat", persona: persona.id, history, domain },
         (response) => {
           if (chrome.runtime.lastError || !response || response.error) {
             resolve({
@@ -179,6 +180,7 @@
 
   function mountOverlay(persona, domain) {
     const history = [{ role: "assistant", content: persona.opening }];
+    let failedAttempts = 0; // argue turns that didn't earn an "allow"
 
     // Audio: unlock on the first user gesture so replies have sound instantly
     // (no async-resume lag), and mute blips when the user prefers reduced motion.
@@ -443,13 +445,22 @@
       input.disabled = true;
       showThinking();
 
-      const { reply, verdict } = await getCharacterResponse(text, persona, history);
-      // On "allow", wait for the line to fully finish (then a short linger)
-      // before walking out — so the character finishes his sentence, then leaves.
-      const onSpoken =
-        verdict === "allow"
-          ? () => setTimeout(allowThrough, CONFIG.allowLingerMs)
-          : null;
+      const { reply, verdict } = await getCharacterResponse(text, persona, history, domain);
+
+      // Count this turn against the user unless it earned a pass.
+      const outOfChances =
+        verdict !== "allow" && ++failedAttempts >= CONFIG.maxFailedAttempts;
+
+      // Sequence what happens once the persona finishes its line:
+      //  - "allow"      → walk out and grant the pass.
+      //  - out of tries → escort the user back (their argument's done).
+      //  - otherwise    → keep the standoff going.
+      let onSpoken = null;
+      if (verdict === "allow") {
+        onSpoken = () => setTimeout(allowThrough, CONFIG.allowLingerMs);
+      } else if (outOfChances) {
+        onSpoken = () => setTimeout(giveUp, CONFIG.allowLingerMs);
+      }
       speak(reply, onSpoken);
       shake(
         overlay,
@@ -461,7 +472,9 @@
       nudgeCharacter(CONFIG.spriteNudge.intensity, CONFIG.spriteNudge.durationMs);
       history.push({ role: "assistant", content: reply });
 
-      if (verdict !== "allow") {
+      // Re-enable input only if the standoff continues; on allow / out-of-chances
+      // it stays disabled while the character leaves.
+      if (verdict !== "allow" && !outOfChances) {
         input.disabled = false;
         input.focus();
       }
