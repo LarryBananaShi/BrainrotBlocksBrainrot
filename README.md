@@ -1,1 +1,1 @@
-# hackthesix
+we hate brainrot
