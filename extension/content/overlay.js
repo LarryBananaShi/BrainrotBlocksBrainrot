@@ -14,6 +14,7 @@
     characterSizePct: 0.55, // sprite height as a fraction of viewport height
     crawlInDurationMs: 4000, // how long the creep-in takes
     crawlOutDurationMs: 4500, // how long the walk-out (on "allow") takes
+    allowLingerMs: 600, // pause after the "allow" line finishes before walking out
     backWalkDurationMs: 3500, // how long the escort walk (on "give up") takes
     backNavDelayMs: 0, // pause after the escort leaves before going back
     centerNoise: 0.05, // rest offset from center, as a fraction of min(vw, vh)
@@ -267,7 +268,7 @@
     // Type a line out character-by-character (Undertale style). The mouth
     // animation runs for exactly as long as the text is typing; when the last
     // character lands, typing and the talk animation stop together.
-    function speak(text) {
+    function speak(text, onDone) {
       bubble.classList.remove("rb-bubble--thinking");
       // Cancel any in-flight typing / stop timer from a previous line.
       if (typeTimer) {
@@ -287,6 +288,10 @@
         if (i >= text.length) {
           typeTimer = null;
           stopTalking();
+          // Fire only on a natural finish. Any interruption (a new speak() or
+          // stopTalking() from walkTo) clears typeTimer before we reach here,
+          // so a cancelled line never triggers onDone.
+          if (typeof onDone === "function") onDone();
           return;
         }
         const char = text[i];
@@ -439,7 +444,13 @@
       showThinking();
 
       const { reply, verdict } = await getCharacterResponse(text, persona, history);
-      speak(reply);
+      // On "allow", wait for the line to fully finish (then a short linger)
+      // before walking out — so the character finishes his sentence, then leaves.
+      const onSpoken =
+        verdict === "allow"
+          ? () => setTimeout(allowThrough, CONFIG.allowLingerMs)
+          : null;
+      speak(reply, onSpoken);
       shake(
         overlay,
         CONFIG.messageShake.intensity,
@@ -450,9 +461,7 @@
       nudgeCharacter(CONFIG.spriteNudge.intensity, CONFIG.spriteNudge.durationMs);
       history.push({ role: "assistant", content: reply });
 
-      if (verdict === "allow") {
-        setTimeout(allowThrough, 1000);
-      } else {
+      if (verdict !== "allow") {
         input.disabled = false;
         input.focus();
       }
