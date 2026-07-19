@@ -21,6 +21,7 @@
     bobFrequencyHz: 3, // walking bob speed (bounces per second) while moving
     bobAmplitudePx: 16, // how far the sprite bobs up/down while walking
     introShake: { intensity: 82, durationMs: 1050, intervalMs: 40, scaleBuffer: 1.12 }, // big shake on entrance
+    typeSpeedMs: 45, // typewriter reveal: ms per character (the one speed knob)
     talkSwitchRange: { minMs: 90, maxMs: 200 }, // base<->talk swap while speaking
     tungFlipRange: { minMs: 400, maxMs: 900 }, // horizontal flip cadence for Tung
     messageShake: { intensity: 22, durationMs: 350, intervalMs: 40, scaleBuffer: 1.03 }, // smaller shake per reply
@@ -47,6 +48,20 @@
   // Random value within a {minMs, maxMs} range.
   function randInRange(r) {
     return r.minMs + Math.random() * (r.maxMs - r.minMs);
+  }
+
+  // Typewriter: is this a character we'd play a blip for? (spaces/newlines: no)
+  function isBlipChar(char) {
+    return !/\s/.test(char);
+  }
+
+  // Typewriter: how long to wait before revealing the *next* character.
+  // Sentence punctuation gets a longer beat so delivery feels natural.
+  // (Pause multipliers become tunable/used more in Task 4.)
+  function nextCharDelay(char, typeSpeedMs) {
+    if (/[.!?…]/.test(char)) return typeSpeedMs * 6;
+    if (/[,;:]/.test(char)) return typeSpeedMs * 3;
+    return typeSpeedMs;
   }
 
   // Jitter an element on a fixed, uniform cadence (`intervalMs`) with decaying
@@ -197,6 +212,7 @@
     const spriteDesc = persona.sprite;
     let talkTimer = null;
     let talkStopTimer = null;
+    let typeTimer = null;
     let talkFrame = false;
     let flipped = false;
 
@@ -232,14 +248,37 @@
       }
     }
 
-    // Show a line and animate the character for a length-based duration.
+    // Type a line out character-by-character (Undertale style). The mouth
+    // animation runs for exactly as long as the text is typing; when the last
+    // character lands, typing and the talk animation stop together.
     function speak(text) {
       bubble.classList.remove("rb-bubble--thinking");
-      setBubble(text);
-      if (talkStopTimer) clearTimeout(talkStopTimer);
+      // Cancel any in-flight typing / stop timer from a previous line.
+      if (typeTimer) {
+        clearTimeout(typeTimer);
+        typeTimer = null;
+      }
+      if (talkStopTimer) {
+        clearTimeout(talkStopTimer);
+        talkStopTimer = null;
+      }
+
+      setBubble("");
       startTalking();
-      const dur = Math.min(6000, Math.max(1500, text.length * 55));
-      talkStopTimer = setTimeout(stopTalking, dur);
+
+      let i = 0;
+      const step = () => {
+        if (i >= text.length) {
+          typeTimer = null;
+          stopTalking();
+          return;
+        }
+        const char = text[i];
+        bubble.textContent += char;
+        i += 1;
+        typeTimer = setTimeout(step, nextCharDelay(char, CONFIG.typeSpeedMs));
+      };
+      step();
     }
 
     // While waiting on the server: character goes idle and the bubble shows "…".
