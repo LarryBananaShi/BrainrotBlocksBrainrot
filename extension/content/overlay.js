@@ -179,6 +179,16 @@
   function mountOverlay(persona, domain) {
     const history = [{ role: "assistant", content: persona.opening }];
 
+    // Audio: unlock on the first user gesture so replies have sound instantly
+    // (no async-resume lag), and mute blips when the user prefers reduced motion.
+    if (window.RotBlips) {
+      RotBlips.installUnlock();
+      const reduceMotion =
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      RotBlips.setMuted(!!reduceMotion);
+    }
+
     const overlay = document.createElement("div");
     overlay.id = OVERLAY_ID;
     overlay.innerHTML = `
@@ -243,6 +253,11 @@
       if (talkStopTimer) {
         clearTimeout(talkStopTimer);
         talkStopTimer = null;
+      }
+      if (typeTimer) {
+        // Halt any in-flight typewriter reveal (e.g. on give-up / walk-out).
+        clearTimeout(typeTimer);
+        typeTimer = null;
       }
       if (spriteDesc.type === "swap") {
         sprite.src = chrome.runtime.getURL(spriteDesc.base); // back to idle
