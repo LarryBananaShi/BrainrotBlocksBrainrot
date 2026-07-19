@@ -11,6 +11,7 @@ var ROT_PERSONAS = {
     name: "David Goggins",
     emoji: "😤",
     sprite: { type: "swap", base: "assets/GOGGINS_BASE.png", talk: "assets/GOGGINS_TALK.png" },
+    blip: { type: "sawtooth", freq: 150, durationMs: 70, gain: 0.16 }, // low & gruff
     opening:
       "WHO'S GONNA CARRY THE BOATS?! Not you here about to SCROLL your day away. Look in the mirror and tell me ONE GOOD REASON I should let you through.",
     systemPrompt:
@@ -31,6 +32,7 @@ var ROT_PERSONAS = {
     name: "Barack Obama",
     emoji: "🎙️",
     sprite: { type: "swap", base: "assets/OBAMA_BASE.png", talk: "assets/OBAMA_TALK.png" },
+    blip: { type: "sine", freq: 330, durationMs: 65, gain: 0.15 }, // smooth & measured
     opening:
       "So... here we are again, folks. Let me be clear: this website will still be here later, but the shine of your potential? That will only fade. Tell me, honestly. Why do you need to be here right now?",
     systemPrompt:
@@ -51,6 +53,7 @@ var ROT_PERSONAS = {
     name: "Tung Tung Tung Sahur",
     emoji: "🥁",
     sprite: { type: "flip", image: "assets/TUNG.png" },
+    blip: { type: "square", freq: 500, jitter: 120, durationMs: 55, gain: 0.13 }, // high & chaotic
     opening:
       "Hey yo it's Triple T on the beat",
     systemPrompt:

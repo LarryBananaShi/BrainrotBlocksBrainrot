@@ -276,7 +276,9 @@
         }
         const char = text[i];
         bubble.textContent += char;
-        if (isBlipChar(char) && window.RotBlips) RotBlips.play(CONFIG.defaultBlip);
+        if (isBlipChar(char) && window.RotBlips) {
+          RotBlips.play(persona.blip || CONFIG.defaultBlip);
+        }
         i += 1;
         typeTimer = setTimeout(step, nextCharDelay(char, CONFIG.typeSpeedMs));
       };
