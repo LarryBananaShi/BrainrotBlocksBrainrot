@@ -195,7 +195,6 @@
     const overlay = document.createElement("div");
     overlay.id = OVERLAY_ID;
     overlay.innerHTML = `
-      <div class="rb-attempts" id="rb-attempts"></div>
       <div class="rb-stage">
         <div class="rb-character" id="rb-character">
           <div class="rb-bubble" id="rb-bubble"></div>
@@ -203,6 +202,7 @@
         </div>
       </div>
       <form class="rb-bottom" id="rb-form">
+        <div class="rb-attempts" id="rb-attempts"></div>
         <div class="rb-input-row">
           <input class="rb-input" id="rb-input" type="text" autocomplete="off"
                  placeholder="Make your case..." />
