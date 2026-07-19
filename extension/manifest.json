@@ -20,7 +20,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["personas.js", "content/overlay.js"],
+      "js": ["personas.js", "content/blips.js", "content/overlay.js"],
       "css": ["content/overlay.css"],
       "run_at": "document_start"
     }
