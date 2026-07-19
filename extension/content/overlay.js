@@ -22,6 +22,7 @@
     bobAmplitudePx: 16, // how far the sprite bobs up/down while walking
     introShake: { intensity: 82, durationMs: 1050, intervalMs: 40, scaleBuffer: 1.12 }, // big shake on entrance
     typeSpeedMs: 45, // typewriter reveal: ms per character (the one speed knob)
+    defaultBlip: { type: "square", freq: 330, durationMs: 60, gain: 0.15 }, // Task 2 default blip; per-persona in Task 3
     talkSwitchRange: { minMs: 90, maxMs: 200 }, // base<->talk swap while speaking
     tungFlipRange: { minMs: 400, maxMs: 900 }, // horizontal flip cadence for Tung
     messageShake: { intensity: 22, durationMs: 350, intervalMs: 40, scaleBuffer: 1.03 }, // smaller shake per reply
@@ -275,6 +276,7 @@
         }
         const char = text[i];
         bubble.textContent += char;
+        if (isBlipChar(char) && window.RotBlips) RotBlips.play(CONFIG.defaultBlip);
         i += 1;
         typeTimer = setTimeout(step, nextCharDelay(char, CONFIG.typeSpeedMs));
       };
