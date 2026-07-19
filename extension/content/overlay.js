@@ -195,6 +195,7 @@
     const overlay = document.createElement("div");
     overlay.id = OVERLAY_ID;
     overlay.innerHTML = `
+      <div class="rb-attempts" id="rb-attempts"></div>
       <div class="rb-stage">
         <div class="rb-character" id="rb-character">
           <div class="rb-bubble" id="rb-bubble"></div>
@@ -214,6 +215,11 @@
     const sprite = overlay.querySelector("#rb-sprite");
     const bubble = overlay.querySelector("#rb-bubble");
     const characterEl = overlay.querySelector("#rb-character");
+    const attemptsEl = overlay.querySelector("#rb-attempts");
+
+    function renderAttempts() {
+      attemptsEl.textContent = `${failedAttempts} / ${CONFIG.maxFailedAttempts} attempts`;
+    }
 
     sprite.src = spriteIdleSrc(persona);
     sprite.style.height = CONFIG.characterSizePct * 100 + "vh";
@@ -450,6 +456,7 @@
       // Count this turn against the user unless it earned a pass.
       const outOfChances =
         verdict !== "allow" && ++failedAttempts >= CONFIG.maxFailedAttempts;
+      renderAttempts();
 
       // Sequence what happens once the persona finishes its line:
       //  - "allow"      → walk out and grant the pass.
@@ -482,6 +489,7 @@
 
     (document.documentElement || document.body).appendChild(overlay);
     setBubble(persona.opening);
+    renderAttempts();
     overlay.querySelector("#rb-form").addEventListener("submit", handleSend);
     overlay.querySelector(".rb-giveup").addEventListener("click", giveUp);
 
