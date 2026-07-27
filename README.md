@@ -5,7 +5,8 @@ Tung Sahur) guard your distracting sites. Hit a blocked site and a character
 takes over the screen — you either give up, or argue your way past them.
 
 Full details: [`docs/mvp-spec.md`](docs/mvp-spec.md).
-[![Watch the video](https://i.sstatic.net/Vp2cE.png)]([![Watch the video](https://i.sstatic.net/Vp2cE.png)](https://youtu.be/vt5fpE0bzSY)
+[![Watch the video](https://i.sstatic.net/Vp2cE.png)]((https://www.youtube.com/watch?v=Y7BJ9qtRf2A))
+
 )
 
 
