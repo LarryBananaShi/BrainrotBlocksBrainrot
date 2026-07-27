@@ -4,8 +4,13 @@ A Chrome extension where pop-culture characters (Obama, David Goggins, Tung Tung
 Tung Sahur) guard your distracting sites. Hit a blocked site and a character
 takes over the screen — you either give up, or argue your way past them.
 
-Full details: [`docs/mvp-spec.md`](docs/mvp-spec.md).
+
 https://www.youtube.com/watch?v=Y7BJ9qtRf2A
+<img width="1362" height="790" alt="image" src="https://github.com/user-attachments/assets/b7440f50-1a51-40d3-95f7-8a39ab03992e" />
+
+
+Full details: [`docs/mvp-spec.md`](docs/mvp-spec.md).
+
 )
 
 
